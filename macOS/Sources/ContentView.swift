@@ -165,12 +165,24 @@ struct ContentView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.violet)
                 Picker("", selection: $selectedModel) {
-                    ForEach(AgentState.modelChoices, id: \.self) { name in
-                        Text(name).tag(name)
+                    ForEach(agent.modelChoices, id: \.self) { name in
+                        HStack(spacing: 5) {
+                            if agent.isInstalled(name) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Theme.green)
+                            } else {
+                                Image(systemName: "arrow.down.circle")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Theme.amber)
+                            }
+                            Text(name)
+                        }
+                        .tag(name)
                     }
                 }
                 .labelsHidden()
-                .frame(width: 140)
+                .frame(width: 160)
                 .onChange(of: selectedModel) { _, newValue in
                     agent.requestModelChange(newValue)
                 }

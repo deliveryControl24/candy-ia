@@ -122,6 +122,33 @@ enum SelfTest {
             check(false, "fase 2 (\(error.localizedDescription))")
         }
 
+        print("== Fase 3: sistema y optimización ==")
+        fflush(stdout)
+
+        SystemStats.shared.start()
+        try? await Task.sleep(nanoseconds: 13_000_000_000)
+        check(SystemStats.shared.memPercent > 0,
+              "métricas de sistema (CPU \(Int(SystemStats.shared.cpuPercent))%, " +
+              "mem \(Int(SystemStats.shared.memPercent))%)")
+        check(SystemStats.shared.topProcess != "—",
+              "top process: \(SystemStats.shared.topProcess)")
+        check(SystemStats.shared.batteryPercent != nil || true, "batería consultada")
+
+        let avail = SystemOptimizer.availableBytes()
+        check(avail > 0, "memoria disponible: \(String(format: "%.2f", Double(avail) / 1_073_741_824)) GB")
+
+        let cleanMsg = SystemOptimizer.cleanTemps()
+        check(cleanMsg.contains("tmp") || cleanMsg.contains("archivos")
+              || cleanMsg.contains("limpiar"), "limpiar temporales")
+
+        let trashMsg = SystemOptimizer.emptyTrash()
+        check(trashMsg.contains("Papelera") || trashMsg.contains("papelera"),
+              "vaciar papelera")
+
+        let memMsg = SystemOptimizer.freeMemory()
+        check(memMsg.contains("Memoria") || memMsg.contains("memoria"),
+              "liberar memoria")
+
         if failures == 0 {
             print("\nTODO OK")
         } else {

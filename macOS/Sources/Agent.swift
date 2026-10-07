@@ -160,10 +160,11 @@ struct OllamaClient {
 
     func hasModel(_ model: String) async -> Bool {
         guard let names = try? await listModels() else { return false }
+        if names.contains(model) { return true }
+        // sin tag explícito: vale cualquier tag instalado con esa base
+        guard !model.contains(":") else { return false }
         let baseName = model.split(separator: ":").first.map(String.init) ?? model
-        return names.contains { name in
-            name == model || name.split(separator: ":").first.map(String.init) == baseName
-        }
+        return names.contains { $0.split(separator: ":").first.map(String.init) == baseName }
     }
 
     func pull(model: String, onStatus: (String) -> Void) async throws {
@@ -459,12 +460,46 @@ struct ModelPrompt: Identifiable {
 
 @MainActor
 final class AgentState: ObservableObject {
-    static let modelChoices = ["llama3.2:3b", "qwen2.5:1.5b", "qwen3:1.7b", "phi4-mini", "gemma3:4b"]
+    /// Catálogo ofrecido en el selector (se descargan bajo demanda).
+    static let catalogue = ["llama3.2:3b", "qwen2.5:1.5b", "qwen3:1.7b", "phi4-mini", "gemma3:4b"]
     static let defaultModel = "llama3.2:3b"
 
     let client = OllamaClient()
 
     @Published var model = AgentState.defaultModel
+    /// Modelos realmente instalados en Ollama (leídos de /api/tags).
+    @Published var installedModels: [String] = []
+
+    /// Selector: primero lo instalado, después el catálogo que falte.
+    var modelChoices: [String] {
+        var out = installedModels
+        for name in AgentState.catalogue {
+            let base = name.split(separator: ":").first.map(String.init) ?? name
+            let yaInstalado = installedModels.contains(name)
+                || (!name.contains(":") && installedModels.contains {
+                    $0.split(separator: ":").first.map(String.init) == base
+                })
+            if !yaInstalado { out.append(name) }
+        }
+        return out
+    }
+
+    func isInstalled(_ name: String) -> Bool {
+        if installedModels.contains(name) { return true }
+        guard !name.contains(":") else { return false }
+        return installedModels.contains { $0.split(separator: ":").first.map(String.init) == name }
+    }
+
+    func refreshModels() async {
+        let names = (try? await client.listModels()) ?? []
+        installedModels = names
+        if !names.isEmpty, !model.contains(":"),
+           let full = names.first(where: { $0.split(separator: ":").first.map(String.init) == model }) {
+            model = full
+            UserDefaults.standard.set(full, forKey: "model")
+        }
+        objectWillChange.send()
+    }
     @Published var display: [DisplayMsg] = []
     @Published var history: [ChatMessage]
     @Published var draft = ""
@@ -523,7 +558,7 @@ final class AgentState: ObservableObject {
             history = [ChatMessage(role: "system", content: systemPrompt)]
         }
         if let saved = UserDefaults.standard.string(forKey: "model"),
-           AgentState.modelChoices.contains(saved) {
+           AgentState.catalogue.contains(saved) {
             model = saved
         }
     }
@@ -610,6 +645,7 @@ final class AgentState: ObservableObject {
                 try await ensureModel(model: model, client: client) { text in
                     self.setStatus(text)
                 }
+                await refreshModels()
                 ready = true
                 setStatus("Listo — \(model)", ok: true)
             } catch {

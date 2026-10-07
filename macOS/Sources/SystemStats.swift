@@ -13,6 +13,10 @@ final class SystemStats: ObservableObject {
     @Published var batteryCharging = false
 
     private var prevTicks: (user: UInt64, system: UInt64, idle: UInt64, nice: UInt64)?
+    private var lastBattery = Date.distantPast
+    private var lastTop = Date.distantPast
+    private var topPrev: [pid_t: UInt64] = [:]
+    private var topPrevDate = Date()
     private var task: Task<Void, Never>?
 
     static let shared = SystemStats()
@@ -23,7 +27,7 @@ final class SystemStats: ObservableObject {
         task = Task { [weak self] in
             while !Task.isCancelled {
                 self?.sample()
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }
     }
@@ -36,8 +40,14 @@ final class SystemStats: ObservableObject {
     private func sample() {
         sampleCPU()
         sampleMemory()
-        sampleBattery()
-        sampleTopProcess()
+        if Date().timeIntervalSince(lastBattery) >= 20 {
+            lastBattery = Date()
+            sampleBattery()
+        }
+        if Date().timeIntervalSince(lastTop) >= 10 {
+            lastTop = Date()
+            sampleTopProcess()
+        }
     }
 
     private func sampleCPU() {
@@ -67,7 +77,11 @@ final class SystemStats: ObservableObject {
             let total = du + ds + di + dn
             if total > 0 {
                 let busy = Double(du + ds + dn) / Double(total) * 100
-                cpuPercent = min(100, max(0, busy))
+                let clamped = min(100, max(0, busy))
+                // solo publica si cambió bastante: evita redibujos continuos
+                if abs(clamped - cpuPercent) >= 0.5 || (clamped == 0) != (cpuPercent == 0) {
+                    cpuPercent = clamped
+                }
             }
         }
         prevTicks = (user, system, idle, nice)
@@ -87,8 +101,11 @@ final class SystemStats: ObservableObject {
         let used = (UInt64(stats.active_count) + UInt64(stats.wire_count)
             + UInt64(stats.compressor_page_count)) * pageSize
         let total = UInt64(ProcessInfo.processInfo.physicalMemory)
-        memUsedGB = Double(used) / 1_073_741_824
-        memPercent = min(100, Double(used) / Double(total) * 100)
+        let pct = min(100, Double(used) / Double(total) * 100)
+        if abs(pct - memPercent) >= 0.5 {
+            memUsedGB = Double(used) / 1_073_741_824
+            memPercent = pct
+        }
     }
 
     private func sampleBattery() {
@@ -107,25 +124,64 @@ final class SystemStats: ObservableObject {
         }
     }
 
+    /// Top process vía sysctl (sin crear procesos auxiliares).
     private func sampleTopProcess() {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/ps")
-        p.arguments = ["-A", "-o", "%cpu,comm", "-r"]
-        let out = Pipe()
-        p.standardOutput = out
-        p.standardError = FileHandle.nullDevice
-        try? p.run()
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        guard let text = String(data: data, encoding: .utf8) else { return }
-        let lines = text.split(separator: "\n")
-        if lines.count > 1 {
-            let first = String(lines[1]).trimmingCharacters(in: .whitespaces)
-            let parts = first.split(separator: " ", maxSplits: 1)
-            if parts.count == 2 {
-                let name = URL(fileURLWithPath: String(parts[1])).lastPathComponent
-                topProcess = "\(name) (\(parts[0])%)"
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
+        var size = 0
+        guard sysctl(&mib, 4, nil, &size, nil, 0) == 0, size > 0 else { return }
+        let stride = MemoryLayout<kinfo_proc>.stride
+        let count = size / stride
+        guard count > 0 else { return }
+        var procs = [kinfo_proc](repeating: kinfo_proc(), count: count)
+        guard sysctl(&mib, 4, &procs, &size, nil, 0) == 0 else { return }
+        let realCount = size / stride
+
+        let now = Date()
+        let interval = max(now.timeIntervalSince(topPrevDate), 0.5)
+        let ncpu = Double(ProcessInfo.processInfo.activeProcessorCount)
+
+        var current: [pid_t: UInt64] = [:]
+        var bestPid: pid_t = 0
+        var bestPct = 0.0
+        let old = topPrev
+
+        for i in 0..<realCount {
+            let pid = procs[i].kp_proc.p_pid
+            guard pid > 0 else { continue }
+            var info = proc_taskinfo()
+            let got = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info,
+                                   Int32(MemoryLayout<proc_taskinfo>.stride))
+            guard got == MemoryLayout<proc_taskinfo>.stride else { continue }
+            let total = info.pti_total_user &+ info.pti_total_system
+            current[pid] = total
+            if let prev = old[pid], total >= prev {
+                let delta = total - prev
+                let pct = Double(delta) / (interval * 1_000_000_000 * ncpu) * 100
+                if pct > bestPct {
+                    bestPct = pct
+                    bestPid = pid
+                }
             }
         }
+
+        if bestPid > 0 {
+            let bestName = processName(pid: bestPid)
+            let shown = min(99.9, bestPct)
+            topProcess = "\(bestName) (\(String(format: "%.0f", shown))%)"
+        }
+
+        topPrev = current
+        topPrevDate = now
+    }
+
+    private func processName(pid: pid_t) -> String {
+        var buf = [CChar](repeating: 0, count: 4096)
+        let len = proc_pidpath(pid, &buf, UInt32(buf.count))
+        if len > 0 {
+            let path = String(cString: buf)
+            let name = URL(fileURLWithPath: path).lastPathComponent
+            if !name.isEmpty { return name }
+        }
+        return "pid \(pid)"
     }
 }

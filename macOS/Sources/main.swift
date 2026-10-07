@@ -4,7 +4,7 @@ import SwiftUI
 func buildMainMenu() {
     let mainMenu = NSMenu()
 
-    let appItem = NSMenuItem()
+    let appItem = NSMenuItem(title: "CANDY IA", action: nil, keyEquivalent: "")
     mainMenu.addItem(appItem)
     let appMenu = NSMenu()
     appItem.submenu = appMenu
@@ -12,7 +12,7 @@ func buildMainMenu() {
                     action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
                     keyEquivalent: "")
     appMenu.addItem(.separator())
-    appMenu.addItem(withTitle: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    appMenu.addItem(withTitle: "Salir de CANDY IA", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
     let editItem = NSMenuItem()
     mainMenu.addItem(editItem)
@@ -41,6 +41,7 @@ func buildMainMenu() {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow?
     var agent: AgentState?
+    var menuBar: MenuBarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMainMenu()
@@ -61,12 +62,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         self.window = window
 
+        menuBar = MenuBarController(agent: agent) { [weak self] screen in
+            agent.screen = screen
+            guard let self, let win = self.window else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            win.makeKeyAndOrderFront(nil)
+        }
+
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+
+        // prueba interna: cerrar la ventana no debe matar la app
+        if ProcessInfo.processInfo.environment["CANDY_TEST_CLOSE"] == "1" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                NSLog("[test] cerrando ventana")
+                self?.window?.performClose(nil)
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows {
+            NSApp.activate(ignoringOtherApps: true)
+            window?.makeKeyAndOrderFront(nil)
+        }
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {

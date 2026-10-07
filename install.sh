@@ -34,7 +34,7 @@ info "macOS $(sw_vers -productversion) · $ARCH"
 info "Descargando CANDY IA…"
 DL_URL="https://github.com/${REPO}/releases/latest/download/CandyIA.dmg"
 if ! curl -fL --progress-bar "$DL_URL" -o "$TMP/CandyIA.dmg"; then
-  die "No pude descargar $DL_URL — ¿existe la release v1.0.0?"
+  die "No pude descargar $DL_URL — ¿existe una release publicada?"
 fi
 ok "Descarga completa"
 
@@ -80,10 +80,22 @@ if ! curl -s --max-time 2 http://127.0.0.1:11434/api/version >/dev/null 2>&1; th
 fi
 
 # 6 ── modelo
+# Respaldo IPv4: en redes sin ruta IPv6 el pull de Ollama falla
+# ("network is unreachable"). Descarga los blobs con curl -4 e instala el manifiesto.
+descargar_modelo_ipv4() {
+  command -v python3 >/dev/null 2>&1 || return 1
+  info "Reintentando la descarga del modelo con IPv4…"
+  curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/tools/seed_models.py" \
+    -o "$TMP/seed_models.py" || return 1
+  python3 "$TMP/seed_models.py" "$MODEL" >/dev/null 2>&1
+}
+
 if ! "$OLLAMA_BIN" list 2>/dev/null | grep -q "^llama3.2"; then
   info "Descargando el modelo $MODEL (~2 GB, la primera vez tarda)…"
   if "$OLLAMA_BIN" pull "$MODEL" >/dev/null 2>&1; then
     ok "Modelo $MODEL listo"
+  elif descargar_modelo_ipv4; then
+    ok "Modelo $MODEL listo (vía IPv4)"
   else
     warn "No pude descargar el modelo ahora; CANDY IA lo reintentará al abrir."
   fi
