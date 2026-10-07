@@ -1,0 +1,4 @@
+build/
+*.dmg
+*.log
+.DS_Store

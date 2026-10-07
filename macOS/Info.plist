@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>es</string>
+	<key>CFBundleExecutable</key>
+	<string>CandyIA</string>
+	<key>CFBundleIconFile</key>
+	<string>CandyIA</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.jhelenaorozco.candyia</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>CANDY IA</string>
+	<key>CFBundleDisplayName</key>
+	<string>CANDY IA</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>CANDY IA — asistente local con Ollama</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CANDY IA usa el micófono para escucharte y ejecutar tus órdenes por voz.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>CANDY IA convierte tu voz en texto en tu Mac, sin enviarlo a ningún servidor.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>CANDY IA ejecuta AppleScript para automatizar aplicaciones del Mac cuando tú lo pides.</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+</dict>
+</plist>
