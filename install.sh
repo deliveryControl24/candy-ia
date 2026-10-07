@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # CANDY IA — instalador oficial
-#   curl -fsSL https://github.com/jhelenaorozco/candy-ia/main/install.sh | bash
+#   curl -fsSL https://github.com/deliveryControl24/candy-ia/main/install.sh | bash
 set -euo pipefail
 
-REPO="jhelenaorozco/candy-ia"
+REPO="deliveryControl24/candy-ia"
 MODEL="llama3.2:3b"
 OLLAMA_URL="https://ollama.com/download/ollama-darwin.tgz"
 
