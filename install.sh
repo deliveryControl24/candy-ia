@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CANDY IA — instalador oficial
-#   curl -fsSL https://github.com/deliveryControl24/candy-ia/main/install.sh | bash
+#   curl -fsSL https://github.com/deliveryControl24/candy-ia/raw/main/install.sh | bash
 set -euo pipefail
 
 REPO="deliveryControl24/candy-ia"

@@ -6,7 +6,7 @@ Asistente de IA local para tu Mac — controla tu equipo por chat o por voz, con
 ## Instalación (una línea)
 
 ```bash
-curl -fsSL https://github.com/deliveryControl24/candy-ia/main/install.sh | bash
+curl -fsSL https://github.com/deliveryControl24/candy-ia/raw/main/install.sh | bash
 ```
 
 El instalador:
